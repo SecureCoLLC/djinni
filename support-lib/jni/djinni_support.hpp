@@ -23,8 +23,8 @@
 #include <string>
 #include <vector>
 
-#include "../proxy_cache_interface.hpp"
 #include "../djinni_common.hpp"
+#include "../proxy_cache_interface.hpp"
 #include <jni.h>
 
 /*
@@ -34,18 +34,19 @@
 // jni.h should really put extern "C" in JNIEXPORT, but it doesn't. :(
 #define CJNIEXPORT extern "C" JNIEXPORT
 
-namespace djinni {
+namespace djinni
+{
 
 /*
  * Global initialization and shutdown. Call these from JNI_OnLoad and JNI_OnUnload.
  */
-void jniInit(JavaVM * jvm);
+void jniInit(JavaVM* jvm);
 void jniShutdown();
 
 /*
  * Get the JNIEnv for the invoking thread. Should only be called on Java-created threads.
  */
-JNIEnv * jniGetThreadEnv();
+JNIEnv* jniGetThreadEnv();
 
 /*
  * Global and local reference guard objects.
@@ -56,72 +57,114 @@ JNIEnv * jniGetThreadEnv();
  * A LocalRef<T> should be constructed with a new local reference. The local reference will
  * be deleted when the LocalRef is deleted.
  */
-struct GlobalRefDeleter { void operator() (jobject globalRef) noexcept; };
-
-template <typename PointerType>
-class GlobalRef : public std::unique_ptr<typename std::remove_pointer<PointerType>::type,
-                                         GlobalRefDeleter> {
-public:
-    GlobalRef() {}
-    GlobalRef(GlobalRef && obj)
-        : std::unique_ptr<typename std::remove_pointer<PointerType>::type, ::djinni::GlobalRefDeleter>(
-            std::move(obj)
-        ) {}
-    GlobalRef(JNIEnv * env, PointerType localRef)
-        : std::unique_ptr<typename std::remove_pointer<PointerType>::type, ::djinni::GlobalRefDeleter>(
-            static_cast<PointerType>(env->NewGlobalRef(localRef)),
-            ::djinni::GlobalRefDeleter{}
-        ) {}
+struct GlobalRefDeleter
+{
+    void operator()(jobject globalRef) noexcept;
 };
 
-struct LocalRefDeleter { void operator() (jobject localRef) noexcept; };
+template <typename PointerType>
+class GlobalRef
+    : public std::unique_ptr<typename std::remove_pointer<PointerType>::type, GlobalRefDeleter>
+{
+public:
+    GlobalRef()
+    {
+    }
+    GlobalRef(GlobalRef&& obj)
+        : std::unique_ptr<typename std::remove_pointer<PointerType>::type,
+                          ::djinni::GlobalRefDeleter>(std::move(obj))
+    {
+    }
+    GlobalRef(JNIEnv* env, PointerType localRef)
+        : std::unique_ptr<typename std::remove_pointer<PointerType>::type,
+                          ::djinni::GlobalRefDeleter>(
+              static_cast<PointerType>(env->NewGlobalRef(localRef)), ::djinni::GlobalRefDeleter{})
+    {
+    }
+};
+
+struct LocalRefDeleter
+{
+    void operator()(jobject localRef) noexcept;
+};
 
 template <typename PointerType>
-class LocalRef : public std::unique_ptr<typename std::remove_pointer<PointerType>::type,
-                                        LocalRefDeleter> {
+class LocalRef
+    : public std::unique_ptr<typename std::remove_pointer<PointerType>::type, LocalRefDeleter>
+{
 public:
-    LocalRef() {}
-    LocalRef(JNIEnv * /*env*/, PointerType localRef)
-        : std::unique_ptr<typename std::remove_pointer<PointerType>::type, ::djinni::LocalRefDeleter>(
-            localRef) {}
+    LocalRef()
+    {
+    }
+    LocalRef(JNIEnv* /*env*/, PointerType localRef)
+        : std::unique_ptr<typename std::remove_pointer<PointerType>::type,
+                          ::djinni::LocalRefDeleter>(localRef)
+    {
+    }
     explicit LocalRef(PointerType localRef)
         : std::unique_ptr<typename std::remove_pointer<PointerType>::type, LocalRefDeleter>(
-            localRef) {}
+              localRef)
+    {
+    }
     // Allow implicit conversion to PointerType so it can be passed
     // as argument to JNI functions expecting PointerType.
     // All functions creating new local references should return LocalRef instead of PointerType
-    operator PointerType() const & { return this->get(); }
+    operator PointerType() const&
+    {
+        return this->get();
+    }
     operator PointerType() && = delete;
 };
 
-template<class T>
-const T& get(const T& x) noexcept { return x; }
-template<class T>
-typename LocalRef<T>::pointer get(const LocalRef<T>& x) noexcept { return x.get(); }
+template <class T>
+const T& get(const T& x) noexcept
+{
+    return x;
+}
+template <class T>
+typename LocalRef<T>::pointer get(const LocalRef<T>& x) noexcept
+{
+    return x.get();
+}
 
-template<class T>
-const T& release(const T& x) noexcept { return x; }
-template<class T>
-typename LocalRef<T>::pointer release(LocalRef<T>& x) noexcept { return x.release(); }
-template<class T>
-typename LocalRef<T>::pointer release(LocalRef<T>&& x) noexcept { return x.release(); }
+template <class T>
+const T& release(const T& x) noexcept
+{
+    return x;
+}
+template <class T>
+typename LocalRef<T>::pointer release(LocalRef<T>& x) noexcept
+{
+    return x.release();
+}
+template <class T>
+typename LocalRef<T>::pointer release(LocalRef<T>&& x) noexcept
+{
+    return x.release();
+}
 
 /*
  * Exception to indicate that a Java exception is pending in the JVM.
  */
-class jni_exception : public std::exception {
+class jni_exception : public std::exception
+{
     GlobalRef<jthrowable> m_java_exception;
+
 public:
-    jni_exception(JNIEnv * env, jthrowable java_exception)
-        : m_java_exception(env, java_exception) {
+    jni_exception(JNIEnv* env, jthrowable java_exception)
+        : m_java_exception(env, java_exception)
+    {
         assert(java_exception);
     }
-    jthrowable java_exception() const { return m_java_exception.get(); }
+    jthrowable java_exception() const
+    {
+        return m_java_exception.get();
+    }
 
     /*
      * Sets the pending JNI exception using this Java exception.
      */
-    void set_as_pending(JNIEnv * env) const noexcept;
+    void set_as_pending(JNIEnv* env) const noexcept;
 };
 
 /*
@@ -131,7 +174,7 @@ public:
  * pending state, and pass the exception to
  * jniThrowCppFromJavaException().
  */
-void jniExceptionCheck(JNIEnv * env);
+void jniExceptionCheck(JNIEnv* env);
 
 /*
  * Throws a C++ exception based on the given Java exception.
@@ -146,42 +189,45 @@ void jniExceptionCheck(JNIEnv * env);
  * will throw a jni_exception containing the given jthrowable.
  */
 DJINNI_NORETURN_DEFINITION
-void jniThrowCppFromJavaException(JNIEnv * env, jthrowable java_exception);
+void jniThrowCppFromJavaException(JNIEnv* env, jthrowable java_exception);
 
 /*
  * Set an AssertionError in env with message message, and then throw via jniExceptionCheck.
  */
 DJINNI_NORETURN_DEFINITION
-void jniThrowAssertionError(JNIEnv * env, const char * file, int line, const char * check);
+void jniThrowAssertionError(JNIEnv* env, const char* file, int line, const char* check);
 
-#define DJINNI_ASSERT_MSG(check, env, message) \
-    do { \
-        ::djinni::jniExceptionCheck(env); \
-        const bool check__res = bool(check); \
-        ::djinni::jniExceptionCheck(env); \
-        if (!check__res) { \
-            ::djinni::jniThrowAssertionError(env, __FILE__, __LINE__, message); \
-        } \
-    } while(false)
+#define DJINNI_ASSERT_MSG(check, env, message)                                                     \
+    do                                                                                             \
+    {                                                                                              \
+        ::djinni::jniExceptionCheck(env);                                                          \
+        const bool check__res = bool(check);                                                       \
+        ::djinni::jniExceptionCheck(env);                                                          \
+        if (!check__res)                                                                           \
+        {                                                                                          \
+            ::djinni::jniThrowAssertionError(env, __FILE__, __LINE__, message);                    \
+        }                                                                                          \
+    } while (false)
 #define DJINNI_ASSERT(check, env) DJINNI_ASSERT_MSG(check, env, #check)
 
 /*
  * Helper for JniClass. (This can't be a subclass because it needs to not be templatized.)
  */
-class JniClassInitializer {
+class JniClassInitializer
+{
 
     using registration_vec = std::vector<std::function<void()>>;
     static registration_vec get_all();
 
 private:
-
     JniClassInitializer(std::function<void()> init);
 
-    template <class C> friend class JniClass;
-    friend void jniInit(JavaVM *);
+    template <class C>
+    friend class JniClass;
+    friend void jniInit(JavaVM*);
 
-    static registration_vec & get_vec();
-    static std::mutex       & get_mutex();
+    static registration_vec& get_vec();
+    static std::mutex& get_mutex();
 };
 
 /*
@@ -203,9 +249,11 @@ private:
  * will only depend on the presence of those actually needed.
  */
 template <class C>
-class JniClass {
+class JniClass
+{
 public:
-    static const C & get() {
+    static const C& get()
+    {
         (void)s_initializer; // ensure that initializer is actually instantiated
         assert(s_singleton);
         return *s_singleton;
@@ -215,7 +263,8 @@ private:
     static const JniClassInitializer s_initializer;
     static std::unique_ptr<C> s_singleton;
 
-    static void allocate() {
+    static void allocate()
+    {
         // We can't use make_unique here, because C will have a private constructor and
         // list JniClass as a friend; so we have to allocate it by hand.
         s_singleton = std::unique_ptr<C>(new C());
@@ -223,7 +272,7 @@ private:
 };
 
 template <class C>
-const JniClassInitializer JniClass<C>::s_initializer ( allocate );
+const JniClassInitializer JniClass<C>::s_initializer(allocate);
 
 template <class C>
 std::unique_ptr<C> JniClass<C>::s_singleton;
@@ -231,10 +280,10 @@ std::unique_ptr<C> JniClass<C>::s_singleton;
 /*
  * Exception-checking helpers. These will throw if an exception is pending.
  */
-GlobalRef<jclass> jniFindClass(const char * name);
-jmethodID jniGetStaticMethodID(jclass clazz, const char * name, const char * sig);
-jmethodID jniGetMethodID(jclass clazz, const char * name, const char * sig);
-jfieldID jniGetFieldID(jclass clazz, const char * name, const char * sig);
+GlobalRef<jclass> jniFindClass(const char* name);
+jmethodID jniGetStaticMethodID(jclass clazz, const char* name, const char* sig);
+jmethodID jniGetMethodID(jclass clazz, const char* name, const char* sig);
+jfieldID jniGetFieldID(jclass clazz, const char* name, const char* sig);
 
 /*
  * Helper for maintaining shared_ptrs to wrapped Java objects.
@@ -269,7 +318,8 @@ jfieldID jniGetFieldID(jclass clazz, const char * name, const char * sig);
  */
 struct JavaIdentityHash;
 struct JavaIdentityEquals;
-struct JavaProxyCacheTraits {
+struct JavaProxyCacheTraits
+{
     using UnowningImplPointer = jobject;
     using OwningImplPointer = jobject;
     using OwningProxyPointer = std::shared_ptr<void>;
@@ -279,7 +329,8 @@ struct JavaProxyCacheTraits {
 };
 extern template class ProxyCache<JavaProxyCacheTraits>;
 using JavaProxyCache = ProxyCache<JavaProxyCacheTraits>;
-template <typename T> using JavaProxyHandle = JavaProxyCache::Handle<GlobalRef<jobject>, T>;
+template <typename T>
+using JavaProxyHandle = JavaProxyCache::Handle<GlobalRef<jobject>, T>;
 
 /*
  * Cache for CppProxy objects. This is the inverse of the JavaProxyCache mechanism above,
@@ -305,27 +356,29 @@ template <typename T> using JavaProxyHandle = JavaProxyCache::Handle<GlobalRef<j
  * leads to use-after-free. Java WeakRefs provide the right lifetime guarantee.
  */
 class JavaWeakRef;
-struct JniCppProxyCacheTraits {
-    using UnowningImplPointer = void *;
+struct JniCppProxyCacheTraits
+{
+    using UnowningImplPointer = void*;
     using OwningImplPointer = std::shared_ptr<void>;
     using OwningProxyPointer = jobject;
     using WeakProxyPointer = JavaWeakRef;
-    using UnowningImplPointerHash = std::hash<void *>;
-    using UnowningImplPointerEqual = std::equal_to<void *>;
+    using UnowningImplPointerHash = std::hash<void*>;
+    using UnowningImplPointerEqual = std::equal_to<void*>;
 };
 extern template class ProxyCache<JniCppProxyCacheTraits>;
 using JniCppProxyCache = ProxyCache<JniCppProxyCacheTraits>;
-template <class T> using CppProxyHandle = JniCppProxyCache::Handle<std::shared_ptr<T>>;
+template <class T>
+using CppProxyHandle = JniCppProxyCache::Handle<std::shared_ptr<T>>;
 
 template <class T>
-static const std::shared_ptr<T> & objectFromHandleAddress(jlong handle) {
+static const std::shared_ptr<T>& objectFromHandleAddress(jlong handle)
+{
     assert(handle);
-    assert(handle > 4096);
+
     // Below line segfaults gcc-4.8. Using a temporary variable hides the bug.
-    //const auto & ret = reinterpret_cast<const CppProxyHandle<T> *>(handle)->get();
-    const CppProxyHandle<T> *proxy_handle =
-        reinterpret_cast<const CppProxyHandle<T> *>(handle);
-    const auto & ret = proxy_handle->get();
+    // const auto & ret = reinterpret_cast<const CppProxyHandle<T> *>(handle)->get();
+    const CppProxyHandle<T>* proxy_handle = reinterpret_cast<const CppProxyHandle<T>*>(handle);
+    const auto& ret = proxy_handle->get();
     assert(ret);
     return ret;
 }
@@ -337,17 +390,21 @@ static const std::shared_ptr<T> & objectFromHandleAddress(jlong handle) {
  * optional<CppProxyClassInfo> where needed. Unfortunately we don't want to depend on optional
  * here, so this object has an invalid state and default constructor.
  */
-struct CppProxyClassInfo {
+struct CppProxyClassInfo
+{
     const GlobalRef<jclass> clazz;
     const jmethodID constructor;
     const jfieldID idField;
 
-    CppProxyClassInfo(const char * className);
+    CppProxyClassInfo(const char* className);
     CppProxyClassInfo();
     ~CppProxyClassInfo();
 
     // Validity check
-    explicit operator bool() const { return bool(clazz); }
+    explicit operator bool() const
+    {
+        return bool(clazz);
+    }
 };
 
 /*
@@ -359,7 +416,8 @@ struct CppProxyClassInfo {
  *     class NativeToken final : djinni::JniInterface<Token, NativeToken> { ... }
  */
 template <class I, class Self>
-class JniInterface {
+class JniInterface
+{
 public:
     /*
      * Given a C++ object, find or create a Java version. The cases here are:
@@ -368,21 +426,23 @@ public:
      * 3. The provided C++ object has an existing CppProxy (Java-side proxy for C++ impl)
      * 4. The provided C++ object needs a new CppProxy allocated
      */
-    jobject _toJava(JNIEnv* jniEnv, const std::shared_ptr<I> & c) const {
+    jobject _toJava(JNIEnv* jniEnv, const std::shared_ptr<I>& c) const
+    {
         // Case 1 - null
-        if (!c) {
+        if (!c)
+        {
             return nullptr;
         }
 
         // Case 2 - already a JavaProxy. Only possible if Self::JavaProxy exists.
-        if (jobject impl = _unwrapJavaProxy<Self>(&c)) {
+        if (jobject impl = _unwrapJavaProxy<Self>(&c))
+        {
             return jniEnv->NewLocalRef(impl);
         }
 
         // Cases 3 and 4.
         assert(m_cppProxyClass);
         return JniCppProxyCache::get(typeid(c), c, &newCppProxy);
-
     }
 
     /*
@@ -392,16 +452,19 @@ public:
      * 3. The provided Java object has an existing JavaProxy (C++-side proxy for a Java impl)
      * 4. The provided Java object needs a new JavaProxy allocated
      */
-    std::shared_ptr<I> _fromJava(JNIEnv* jniEnv, jobject j) const {
+    std::shared_ptr<I> _fromJava(JNIEnv* jniEnv, jobject j) const
+    {
         // Case 1 - null
-        if (!j) {
+        if (!j)
+        {
             return nullptr;
         }
 
         // Case 2 - already a Java proxy; we just need to pull the C++ impl out. (This case
         // is only possible if we were constructed with a cppProxyClassName parameter.)
-        if (m_cppProxyClass
-                && jniEnv->IsSameObject(jniEnv->GetObjectClass(j), m_cppProxyClass.clazz.get())) {
+        if (m_cppProxyClass &&
+            jniEnv->IsSameObject(jniEnv->GetObjectClass(j), m_cppProxyClass.clazz.get()))
+        {
             jlong handle = jniEnv->GetLongField(j, m_cppProxyClass.idField);
             jniExceptionCheck(jniEnv);
             return objectFromHandleAddress<I>(handle);
@@ -413,10 +476,16 @@ public:
     }
 
     // Constructor for interfaces for which a Java-side CppProxy class exists
-    JniInterface(const char * cppProxyClassName) : m_cppProxyClass(cppProxyClassName) {}
+    JniInterface(const char* cppProxyClassName)
+        : m_cppProxyClass(cppProxyClassName)
+    {
+    }
 
     // Constructor for interfaces without a Java proxy class
-    JniInterface() : m_cppProxyClass{} {}
+    JniInterface()
+        : m_cppProxyClass{}
+    {
+    }
 
 private:
     /*
@@ -424,16 +493,21 @@ private:
      * only exists if the code generator emitted one (if Self::JavaProxy exists).
      */
     template <typename S, typename JavaProxy = typename S::JavaProxy>
-    jobject _unwrapJavaProxy(const std::shared_ptr<I> * c) const {
-        if (auto proxy = dynamic_cast<JavaProxy *>(c->get())) {
+    jobject _unwrapJavaProxy(const std::shared_ptr<I>* c) const
+    {
+        if (auto proxy = dynamic_cast<JavaProxy*>(c->get()))
+        {
             return proxy->JavaProxyHandle<JavaProxy>::get().get();
-        } else {
+        }
+        else
+        {
             return nullptr;
         }
     }
 
     template <typename S>
-    jobject _unwrapJavaProxy(...) const {
+    jobject _unwrapJavaProxy(...) const
+    {
         return nullptr;
     }
 
@@ -442,18 +516,18 @@ private:
      * it. This is actually called by jniCppProxyCacheGet, which holds a lock on the global
      * C++-to-Java proxy map object.
      */
-    static std::pair<jobject, void*> newCppProxy(const std::shared_ptr<void> & cppObj) {
-        const auto & data = JniClass<Self>::get();
-        const auto & jniEnv = jniGetThreadEnv();
+    static std::pair<jobject, void*> newCppProxy(const std::shared_ptr<void>& cppObj)
+    {
+        const auto& data = JniClass<Self>::get();
+        const auto& jniEnv = jniGetThreadEnv();
         std::unique_ptr<CppProxyHandle<I>> to_encapsulate(
-                new CppProxyHandle<I>(std::static_pointer_cast<I>(cppObj)));
+            new CppProxyHandle<I>(std::static_pointer_cast<I>(cppObj)));
         jlong handle = static_cast<jlong>(reinterpret_cast<uintptr_t>(to_encapsulate.get()));
-        jobject cppProxy = jniEnv->NewObject(data.m_cppProxyClass.clazz.get(),
-                                             data.m_cppProxyClass.constructor,
-                                             handle);
+        jobject cppProxy = jniEnv->NewObject(
+            data.m_cppProxyClass.clazz.get(), data.m_cppProxyClass.constructor, handle);
         jniExceptionCheck(jniEnv);
         to_encapsulate.release();
-        return { cppProxy, cppObj.get() };
+        return {cppProxy, cppObj.get()};
     }
 
     /*
@@ -461,21 +535,23 @@ private:
      * emitted one (if Self::JavaProxy exists).
      */
     template <typename S, typename JavaProxy = typename S::JavaProxy>
-    std::shared_ptr<I> _getJavaProxy(jobject j) const {
+    std::shared_ptr<I> _getJavaProxy(jobject j) const
+    {
         static_assert(std::is_base_of<JavaProxyHandle<JavaProxy>, JavaProxy>::value,
-            "JavaProxy must derive from JavaProxyCacheEntry");
+                      "JavaProxy must derive from JavaProxyCacheEntry");
 
         return std::static_pointer_cast<JavaProxy>(JavaProxyCache::get(
-            typeid(JavaProxy), j,
-            [] (const jobject & obj) -> std::pair<std::shared_ptr<void>, jobject> {
+            typeid(JavaProxy),
+            j,
+            [](const jobject& obj) -> std::pair<std::shared_ptr<void>, jobject> {
                 auto ret = std::make_shared<JavaProxy>(obj);
-                return { ret, ret->JavaProxyHandle<JavaProxy>::get().get() };
-            }
-        ));
+                return {ret, ret->JavaProxyHandle<JavaProxy>::get().get()};
+            }));
     }
 
     template <typename S>
-    std::shared_ptr<I> _getJavaProxy(...) const {
+    std::shared_ptr<I> _getJavaProxy(...) const
+    {
         assert(false);
         return nullptr;
     }
@@ -502,7 +578,8 @@ private:
  * the destructor cannot return the new reference value for the parent
  * frame.
  */
-class JniLocalScope {
+class JniLocalScope
+{
 public:
     /*
      * Create the guard object and begin the local frame.
@@ -512,8 +589,12 @@ public:
      *  allocate.
      */
     JniLocalScope(JNIEnv* p_env, jint capacity, bool throwOnError = true);
-    bool checkSuccess() const { return m_success; }
+    bool checkSuccess() const
+    {
+        return m_success;
+    }
     ~JniLocalScope();
+
 private:
     JniLocalScope(const JniLocalScope& other);
     JniLocalScope& operator=(const JniLocalScope& other);
@@ -525,28 +606,32 @@ private:
     const bool m_success;
 };
 
-jstring jniStringFromUTF8(JNIEnv * env, const std::string & str);
-std::string jniUTF8FromString(JNIEnv * env, const jstring jstr);
+jstring jniStringFromUTF8(JNIEnv* env, const std::string& str);
+std::string jniUTF8FromString(JNIEnv* env, const jstring jstr);
 
-jstring jniStringFromWString(JNIEnv * env, const std::wstring & str);
-std::wstring jniWStringFromString(JNIEnv * env, const jstring jstr);
+jstring jniStringFromWString(JNIEnv* env, const std::wstring& str);
+std::wstring jniWStringFromString(JNIEnv* env, const jstring jstr);
 
-class JniEnum {
+class JniEnum
+{
 public:
     /*
      * Given a Java object, find its numeric value. This returns a jint, which the caller can
      * static_cast<> into the necessary C++ enum type.
      */
-    jint ordinal(JNIEnv * env, jobject obj) const;
+    jint ordinal(JNIEnv* env, jobject obj) const;
 
     /*
      * Create a Java value of the wrapped class with the given value.
      */
-    LocalRef<jobject> create(JNIEnv * env, jint value) const;
+    LocalRef<jobject> create(JNIEnv* env, jint value) const;
 
 protected:
-    JniEnum(const std::string & name);
-    jclass enumClass() const { return m_clazz.get(); }
+    JniEnum(const std::string& name);
+    jclass enumClass() const
+    {
+        return m_clazz.get();
+    }
 
 private:
     const GlobalRef<jclass> m_clazz;
@@ -554,34 +639,38 @@ private:
     const jmethodID m_methOrdinal;
 };
 
-class JniFlags : private JniEnum {
+class JniFlags : private JniEnum
+{
 public:
     /*
      * Given a Java EnumSet convert it to the corresponding bit pattern
      * which can then be static_cast<> to the actual enum.
      */
-    unsigned flags(JNIEnv * env, jobject obj) const;
+    unsigned flags(JNIEnv* env, jobject obj) const;
 
     /*
      * Create a Java EnumSet of the specified flags considering the given number of active bits.
      */
-    LocalRef<jobject> create(JNIEnv * env, unsigned flags, int bits) const;
+    LocalRef<jobject> create(JNIEnv* env, unsigned flags, int bits) const;
 
     using JniEnum::create;
 
 protected:
-    JniFlags(const std::string & name);
+    JniFlags(const std::string& name);
 
 private:
-    const GlobalRef<jclass> m_clazz { jniFindClass("java/util/EnumSet") };
-    const jmethodID m_methNoneOf { jniGetStaticMethodID(m_clazz.get(), "noneOf", "(Ljava/lang/Class;)Ljava/util/EnumSet;") };
-    const jmethodID m_methAdd { jniGetMethodID(m_clazz.get(), "add", "(Ljava/lang/Object;)Z") };
-    const jmethodID m_methIterator { jniGetMethodID(m_clazz.get(), "iterator", "()Ljava/util/Iterator;") };
-    const jmethodID m_methSize { jniGetMethodID(m_clazz.get(), "size", "()I") };
+    const GlobalRef<jclass> m_clazz{jniFindClass("java/util/EnumSet")};
+    const jmethodID m_methNoneOf{
+        jniGetStaticMethodID(m_clazz.get(), "noneOf", "(Ljava/lang/Class;)Ljava/util/EnumSet;")};
+    const jmethodID m_methAdd{jniGetMethodID(m_clazz.get(), "add", "(Ljava/lang/Object;)Z")};
+    const jmethodID m_methIterator{
+        jniGetMethodID(m_clazz.get(), "iterator", "()Ljava/util/Iterator;")};
+    const jmethodID m_methSize{jniGetMethodID(m_clazz.get(), "size", "()I")};
 
-    struct {
-        const GlobalRef<jclass> clazz { jniFindClass("java/util/Iterator") };
-        const jmethodID methNext { jniGetMethodID(clazz.get(), "next", "()Ljava/lang/Object;") };
+    struct
+    {
+        const GlobalRef<jclass> clazz{jniFindClass("java/util/Iterator")};
+        const jmethodID methNext{jniGetMethodID(clazz.get(), "next", "()Ljava/lang/Object;")};
     } m_iterator;
 };
 
@@ -600,7 +689,7 @@ private:
  * jni_exception directly into Java, or throw a RuntimeException for any
  * other std::exception.
  */
-void jniSetPendingFromCurrent(JNIEnv * env, const char * ctx) noexcept;
+void jniSetPendingFromCurrent(JNIEnv* env, const char* ctx) noexcept;
 
 /*
  * Helper for JNI_TRANSLATE_EXCEPTIONS_RETURN.
@@ -615,7 +704,7 @@ void jniSetPendingFromCurrent(JNIEnv * env, const char * ctx) noexcept;
  *
  * This is called by the default implementation of jniSetPendingFromCurrent.
  */
-void jniDefaultSetPendingFromCurrent(JNIEnv * env, const char * ctx) noexcept;
+void jniDefaultSetPendingFromCurrent(JNIEnv* env, const char* ctx) noexcept;
 
 /* Catch C++ exceptions and translate them to Java exceptions.
  *
@@ -630,10 +719,11 @@ void jniDefaultSetPendingFromCurrent(JNIEnv * env, const char * ctx) noexcept;
  * converted. (For JNI outer-layer calls, this result will always be ignored by JNI, so
  * it can safely be 0 for any function with a non-void return value.)
  */
-#define JNI_TRANSLATE_EXCEPTIONS_RETURN(env, ret) \
-    catch (const std::exception &) { \
-        ::djinni::jniSetPendingFromCurrent(env, __func__); \
-        return ret; \
+#define JNI_TRANSLATE_EXCEPTIONS_RETURN(env, ret)                                                  \
+    catch (const std::exception&)                                                                  \
+    {                                                                                              \
+        ::djinni::jniSetPendingFromCurrent(env, __func__);                                         \
+        return ret;                                                                                \
     }
 
 /* Catch jni_exception and translate it back to a Java exception, without catching
@@ -649,10 +739,11 @@ void jniDefaultSetPendingFromCurrent(JNIEnv * env, const char * ctx) noexcept;
  * converted. (For JNI outer-layer calls, this result will always be ignored by JNI, so
  * it can safely be 0 for any function with a non-void return value.)
  */
-#define JNI_TRANSLATE_JNI_EXCEPTIONS_RETURN(env, ret) \
-    catch (const ::djinni::jni_exception & e) { \
-        e.set_as_pending(env); \
-        return ret; \
+#define JNI_TRANSLATE_JNI_EXCEPTIONS_RETURN(env, ret)                                              \
+    catch (const ::djinni::jni_exception& e)                                                       \
+    {                                                                                              \
+        e.set_as_pending(env);                                                                     \
+        return ret;                                                                                \
     }
 
 } // namespace djinni
